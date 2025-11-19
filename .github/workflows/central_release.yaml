@@ -1,0 +1,64 @@
+name: Central Semantic Release
+
+on:
+  repository_dispatch:
+    types: [trigger-semantic-release] # Тип события, которое будет его запускать
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract target repository info
+        id: repo_info
+        run: |
+          echo "TARGET_REPO=${{ github.event.client_payload.repository }}" >> "$GITHUB_OUTPUT"
+          echo "TARGET_REF=${{ github.event.client_payload.ref }}" >> "$GITHUB_OUTPUT"
+          echo "TARGET_SHA=${{ github.event.client_payload.sha }}" >> "$GITHUB_OUTPUT"
+          echo "TRIGGERING_REPO_ID=${{ github.event.repository.id }}" >> "$GITHUB_OUTPUT"
+        
+      - name: Display target repository info
+        run: |
+          echo "Target Repository: ${{ steps.repo_info.outputs.TARGET_REPO }}"
+          echo "Target Ref: ${{ steps.repo_info.outputs.TARGET_REF }}"
+          echo "Target SHA: ${{ steps.repo_info.outputs.TARGET_SHA }}"
+
+      - name: Checkout the TARGET repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.repo_info.outputs.TARGET_REPO }}
+          ref: ${{ steps.repo_info.outputs.TARGET_REF }}
+          path: target-repo # Клонируем его в поддиректорию
+          fetch-depth: 0 # Важно: получить всю историю Git для анализа коммитов
+          # This token MUST have 'repo' scope for the TARGET repository.
+          # It's best to create a dedicated PAT and store it as a secret in THIS central repo.
+          token: ${{ secrets.CENTRAL_RELEASE_PAT }} 
+
+      - name: Checkout THIS (central) repository's tooling
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }} # Клонируем этот же центральный репозиторий
+          path: release-tooling
+          token: ${{ secrets.GITHUB_TOKEN }} # Токен для доступа к этому репозиторию (если он приватный)
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install semantic-release dependencies
+        working-directory: ./release-tooling
+        run: npm install
+
+      - name: Run semantic-release
+        working-directory: ./target-repo # Запускаем semantic-release в контексте целевого репозитория
+        env:
+          # GITHUB_TOKEN для работы с API GitHub целевого репозитория.
+          # Используем тот же PAT, что и для клонирования, т.к. GITHUB_TOKEN из central_release.yml
+          # не будет иметь прав на целевой репозиторий.
+          GITHUB_TOKEN: ${{ secrets.CENTRAL_RELEASE_PAT }} 
+          # Если ваш репозиторий использует GitLab, GitHub_TOKEN нужно заменить на GL_TOKEN и т.д.
+          
+        run: |
+          # Запускаем semantic-release, используя конфигурацию из центрального репозитория
+          ../release-tooling/node_modules/.bin/semantic-release \
+            --config ../release-tooling/release.config.js
