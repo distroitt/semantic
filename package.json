@@ -1,0 +1,16 @@
+{
+  "name": "semantic-release-toolkit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Centralized semantic-release toolkit",
+  "scripts": {
+    "semantic-release": "semantic-release"
+  },
+  "devDependencies": {
+    "semantic-release": "^23.0.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^12.0.1",
+    "@semantic-release/github": "^10.0.0"
+    // Добавьте любые другие плагины semantic-release, которые вам понадобятся
+  }
+}
